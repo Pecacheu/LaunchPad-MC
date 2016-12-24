@@ -1,0 +1,14 @@
+main: com.pecacheu.lpserver.Main
+name: LaunchPadMC
+version: 1.3.0
+author: Pecacheu
+description: Use Novation LaunchPad to Control Minecraft!
+commands:
+  lpmc:
+    description: Special Use. It will be explained when needed.
+    usage: /lpmc
+    permission: launchpadmc.admin
+    permission-message: What are you even doing right now? Running random commands?
+permissions:
+  launchpadmc.admin:
+    default: op
