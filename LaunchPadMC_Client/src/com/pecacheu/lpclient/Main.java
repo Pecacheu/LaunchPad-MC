@@ -10,7 +10,6 @@ import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.Socket;
 import java.net.UnknownHostException;
-import java.util.Collection;
 
 import javax.sound.midi.MidiDevice;
 import javax.sound.midi.MidiUnavailableException;
@@ -18,7 +17,7 @@ import javax.sound.midi.ShortMessage;
 
 public class Main {
 	static int PORT = 25585;
-	static String HOST = "forestfiremc.net";
+	static String HOST = "localhost";
 	LaunchPad lp;
 	
 	volatile boolean enabled = false;
@@ -40,7 +39,7 @@ public class Main {
 	volatile String[] eKeys = {}; volatile int[] eFloors = {};
 	volatile int[] eDir = {}; volatile int[] eLevel = {}; //TODO Check for sync in all uses. Maybe they don't have to be volatile?
 	volatile int viewMode = 0, lOffset = 0, fMax = 0, selElev = -1;
-	volatile boolean vmToggle = true;
+	volatile boolean vmToggle = true, wait = true;
 	
 	//SelElev Data Storage:
 	volatile int[] csStatus = {}; volatile int pCount = 0;
@@ -81,6 +80,8 @@ public class Main {
 		MidiDevice.Info[] devList = LaunchPad.getDevice(); if(devList == null) { err("No LaunchPad device found!"); return; }
 		try { lp = new LaunchPad(devList[0], devList[1]); } catch(MidiUnavailableException e) { err("Could not open LaunchPad device!"); return; }
 		
+		lp.scrollText(PadColor.midBlue, HOST+":"+PORT);
+		
 		//lp.faderMode(); lp.fader(0, false, 20, 100); lp.fader(1, false, 22, 100);
 		//lp.fader(2, false, 0, 0); lp.fader(3, false, 0, 0); lp.fader(4, false, 0, 0);
 		//lp.fader(5, false, 0, 0); lp.fader(6, false, 0, 0); lp.fader(7, true, 65, 80);
@@ -117,7 +118,7 @@ public class Main {
 		} catch(Exception e) { e.printStackTrace(); }}).start();*/
 		
 		cThread = new Thread(() -> { while(true) try { //Send data to server:
-			if(!enabled) { redraw(); connectToServer(); }
+			if(!enabled) { while(wait) {} redraw(); connectToServer(); }
 			
 			//Send query requests every 500ms.
 			synchronized(this) { if(selElev != -1) { sendMsg((viewMode==0?"Q$":"F$")+eKeys[selElev]); }}
@@ -188,12 +189,11 @@ public class Main {
 		
 		//Set LaunchPad MIDI Listener:
 		lp.setListener((msg) -> {
-			boolean cancel = !enabled;
-			synchronized(slSync) { noActivity = 0; if(sleep != null) cancel = true; }
-			int status = msg.getStatus();
-			
-			if(!cancel && (status == ShortMessage.NOTE_ON || status == ShortMessage.CONTROL_CHANGE)) {
-				int note = msg.getMessage()[1], valRaw = msg.getMessage()[2]; Position pos = Position.fromLed(note);
+			synchronized(slSync) { noActivity = 0; if(sleep != null) return; }
+			int status = msg.getStatus(); byte[] data = msg.getMessage();
+			boolean isNote = (status == ShortMessage.NOTE_ON || status == ShortMessage.CONTROL_CHANGE);
+			if(enabled) { if(isNote) {
+				int note = data[1], valRaw = data[2]; Position pos = Position.fromLed(note);
 				boolean val = valRaw > 0;
 				
 				synchronized(this) { if(viewMode == 0) { if(status == ShortMessage.NOTE_ON) { //Square Pads:
@@ -232,25 +232,35 @@ public class Main {
 						if(vmToggle) { viewMode = 0; lp.setAll(0); doRedraw(); } else vmToggle = true;
 					} else lp.setLed(note, PadColor.magenta);
 				}}}
-				
-				/*int note = msg.getMessage()[1]; int val = msg.getMessage()[2];
-				if(msg.getStatus() == ShortMessage.NOTE_ON) {
-					System.out.println("Got note on "+note+": "+val);
-					lp.setLed(Position.fromLed(note).toLed(), val>0?PadColor.white:PadColor.off);
+			}} else {
+				if(isNote) {
+					int note = data[1];
+					if(note == 8) disable();
 				}
-				else if(msg.getStatus() == ShortMessage.POLY_PRESSURE) System.out.println("Got polyPressure on "+note+": "+val);
-				else if(msg.getStatus() == ShortMessage.CONTROL_CHANGE) {
-					System.out.println("Got ctrlChg on "+note+": "+val);
-					Position pos = Position.fromLed(note);
-					if(note == 10) lp.setLed(note, val>0?PadColor.red:PadColor.off);
-					else if(pos.x == 9) lp.setLed(note, val>0?PadColor.green:PadColor.off);
-					else if(pos.y == 9 && pos.x < 5) lp.setLed(note, val>0?PadColor.skyBlue:PadColor.off);
-					else if(pos.y == 0) {}
-					else lp.setLed(note, val>0?PadColor.yellow:PadColor.off);
-				}
-				else if(msg.getStatus() == SysexMessage.SYSTEM_EXCLUSIVE) System.out.println("Got sysex");
-				else System.out.println("Got message of type: "+msg.getClass().getName());*/
+				if(wait) wait = false;
+				/* else if(status == SysexMessage.SYSTEM_EXCLUSIVE) {
+					if(data.length == 8 && data[6] == 21) wait = false;
+				}*/
 			}
+			
+			/*int note = data[1]; int val = data[2];
+			if(status == ShortMessage.NOTE_ON) {
+				System.out.println("Got note on "+note+": "+val);
+				//lp.setLed(Position.fromLed(note).toLed(), val>0?PadColor.white:PadColor.off);
+			} else if(status == ShortMessage.POLY_PRESSURE) System.out.println("Got polyPressure on "+note+": "+val);
+			else if(status == ShortMessage.CONTROL_CHANGE) {
+				System.out.println("Got ctrlChg on "+note+": "+val);
+				//Position pos = Position.fromLed(note);
+				//if(note == 10) lp.setLed(note, val>0?PadColor.red:PadColor.off);
+				//else if(pos.x == 9) lp.setLed(note, val>0?PadColor.green:PadColor.off);
+				//else if(pos.y == 9 && pos.x < 5) lp.setLed(note, val>0?PadColor.skyBlue:PadColor.off);
+				//else if(pos.y == 0) {}
+				//else lp.setLed(note, val>0?PadColor.yellow:PadColor.off);
+			} else if(status == SysexMessage.SYSTEM_EXCLUSIVE) {
+				String s=""; for(int i=0,l=data.length; i<l; i++) s += data[i]+",";
+				System.out.println("Got sysex {"+s.substring(0,s.length()-1)+"}");
+			} else System.out.println("Got message of type: "+msg.getClass().getName());*/
+			
 			//t.interrupt(); lp.setAll(-1); try { lp.flush(); } catch(Exception e) { e.printStackTrace(); }
 			//System.out.println("EXIT"); System.exit(0);
 		});
@@ -339,7 +349,7 @@ public class Main {
 				if(viewMode == 1) { //Floor View:
 					//Determine Block Color:
 					int bColor = PadColor.brown; switch(fType) {
-						case "GLASS": bColor = PadColor.darkGrey; break;
+						case "GLASS": case "STAINED_GLASS": bColor = PadColor.darkGrey; break;
 						case "IRON_BLOCK": bColor = PadColor.coolWhite; break;
 						case "GOLD_BLOCK": bColor = PadColor.yellow; break;
 						case "EMERALD_BLOCK": bColor = PadColor.lime; break;
@@ -361,8 +371,8 @@ public class Main {
 			
 			lp.updateAll(frame); lp.setLed(99, PadColor.darkGrey);
 		}} else {
-			lp.setAll(0); lp.pulseLed(99, PadColor.cloud); //Reset variables:
-			if(eKeys.length > 0) {
+			lp.setAll(0); lp.pulseLed(99, PadColor.cloud); lp.setLed(8, PadColor.red);
+			if(eKeys.length > 0) { //Reset variables:
 				eKeys = new String[0]; eFloors = new int[0]; eDir = new int[0]; eLevel = new int[0];
 				viewMode = 0; vmToggle = true; lOffset = 0; fMax = 0; selElev = -1;
 				csStatus = new int[0]; pCount = 0; doors = false; noRedraw = false;

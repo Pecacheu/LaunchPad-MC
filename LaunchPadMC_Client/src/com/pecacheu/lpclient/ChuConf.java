@@ -1,3 +1,6 @@
+//This work is licensed under a GNU General Public License. Visit http://gnu.org/licenses/gpl-3.0-standalone.html for details.
+//ChuConf Config File Interpreter, v2.4. Copyright (©) 2016, Pecacheu (Bryce Peterson, bbryce.com)
+
 package com.pecacheu.lpclient;
 
 import java.io.File;
@@ -9,15 +12,16 @@ import java.util.TreeMap;
 import java.util.regex.Pattern;
 
 public class ChuConf {
-	private static final String EXT = ".cnf";
-	private static final Pattern TST = Pattern.compile("^[a-zA-Z]+[a-zA-Z0-9_]*$"),
-	VAL_TST = Pattern.compile("^[ -9;-~]+$"), REM_NEWLINE = Pattern.compile("[\n\r]");
+	public static final String EXT = ".cnf";
+	public static final Pattern KEY_CHECK = Pattern.compile("[^a-zA-Z0-9_]");
+	private static final Pattern KEY_TEST = Pattern.compile("^[a-zA-Z]+[a-zA-Z0-9_]*$"),
+	VAL_TEST = Pattern.compile("^[ -9;-~]+$"), REM_NEWLINE = Pattern.compile("[\n\r]");
 	
 	private TreeMap<String,Object> prop = new TreeMap<String,Object>();
 	String header = "";
 	
 	ChuConf() {}
-	ChuConf(InputStream in) throws Exception { doFileLoad(in); }
+	ChuConf(String raw) throws Exception { parse(raw); }
 	
 	//---- Convenience Functions:
 	
@@ -33,20 +37,26 @@ public class ChuConf {
 	
 	//---- File Loading:
 	
+	//Must include extension in file name!
+	public static String unpack(String intFile, String outFile) throws Exception {
+		String data = readFile(ChuConf.class.getResourceAsStream(intFile));
+		PrintWriter writer = new PrintWriter(outFile==null?intFile:outFile, "UTF-8");
+		writer.print(data); writer.close(); return data;
+	}
+	
 	public static ChuConf loadUnpack(String iname) throws Exception {
-		return new ChuConf(ChuConf.class.getResourceAsStream(iname+EXT));
+		return new ChuConf(readFile(ChuConf.class.getResourceAsStream(iname+EXT)));
 	}
 	
 	public static ChuConf load(String fname) throws Exception {
-		return new ChuConf(new FileInputStream(fname+EXT));
+		return new ChuConf(readFile(new FileInputStream(fname+EXT)));
 	}
 	
-	private void doFileLoad(InputStream input) throws Exception {
+	private static String readFile(InputStream input) throws Exception {
 		String data = ""; while(input.available() > 0) {
-			byte[] bytes = new byte[1024]; input.read(bytes);
-			data += new String(bytes);
+			int c=input.read(); if(c<0) break; data += (char)c;
 		}
-		input.close(); parse(data);
+		input.close(); return data;
 	}
 	
 	public void save(String fname) throws Exception {
@@ -73,13 +83,13 @@ public class ChuConf {
 			if(line.length() <= 0) continue; int scInd = line.indexOf(':');
 			if(scInd == line.length()-1) parseSub(line.substring(0,line.length()-1), 1, it, null); //Section
 			else if(scInd != -1) trySetProp(line.substring(0,scInd), line.substring(scInd+1).trim(), it.index+1); //Property
-			else throw new Exception("Expected semicolon! Line: "+it.index+1);
+			else throw new Exception("Expected semicolon! Line: "+(it.index+1));
 		}
 	}
 	
 	private void parseSub(String name, int depth, ChuIterator<String> it, ChuConfSection par) throws Exception {
 		//TODO Main.dbg("parseSub, depth="+depth+", name="+name);
-		if(!isValid(name)) throw new Exception("Invalid section name! Line: "+it.index+1);
+		if(!isValid(name)) throw new Exception("Invalid section name! Line: "+(it.index+1));
 		
 		ChuConfSection sec = new ChuConfSection();
 		
@@ -92,9 +102,9 @@ public class ChuConf {
 			//Check indent:
 			if(line.length() <= 0) continue;
 			int d = 0; for(int i=0,l=line.length(); i<l; i++) { if(line.charAt(i) != '-') break; d++; }
-			if(d < depth) { if(fLine) throw new Exception("Section has no content! Line: "+it.index+1); else { it.goBack(); break; }}
-			else if(d > depth) throw new Exception("Found too much indent! Line: "+it.index+1);
-			if(line.charAt(d) != ' ') throw new Exception("Expected space after indent! Line: "+it.index+1);
+			if(d < depth) { if(fLine) throw new Exception("Section has no content! Line: "+(it.index+1)); else { it.goBack(); break; }}
+			else if(d > depth) throw new Exception("Found too much indent! Line: "+(it.index+1));
+			if(line.charAt(d) != ' ') throw new Exception("Expected space after indent! Line: "+(it.index+1));
 			line = line.substring(d+1);
 			
 			//Parse line:
@@ -109,16 +119,22 @@ public class ChuConf {
 	
 	private void trySetProp(String key, String rawVal, int line) throws Exception {
 		//TODO Main.dbg("trySetProp:"+key+","+rawVal);
-		if(!isValid(key)) throw new Exception("Invalid property key! Line: "+line);
+		if(!isValid(key)) throw new Exception("Invalid property key '"+key+"'! Line: "+line);
 		try {
-			if(rawVal.contains(",")) {
-				String[] vals = rawVal.split(","); ChuList<Integer> intVals = new ChuList<Integer>();
-				for(int i=0,l=vals.length; i<l; i++) intVals.add(new Integer(vals[i]));
-				setProp(key, intVals);
-			} else if(rawVal.contains(".")) setProp(key, new Double(rawVal));
-			else setProp(key, new Integer(rawVal));
+			if(rawVal.contains(",")) { //List:
+				String[] vals = rawVal.split(","); ChuList<Object> valList = new ChuList<Object>();
+				//Determine list type:
+				int type = 0; //List Of Integer
+				if(vals[0].contains(".")) type = 1; //List Of Double
+				for(int i=0,l=vals.length; i<l; i++) {
+					if(type==1) valList.add(new Double(vals[i]));
+					else valList.add(new Integer(vals[i]));
+				}
+				setProp(key, valList);
+			} else if(rawVal.contains(".")) setProp(key, new Double(rawVal)); //Double
+			else setProp(key, new Integer(rawVal)); //Integer
 		} catch(NumberFormatException e) {
-			if(!setProp(key, rawVal)) throw new Exception("Invalid line formatting! Line: "+line);
+			if(!setProp(key, rawVal)) throw new Exception("Invalid line formatting! Line: "+line); //String
 		}
 		//TODO Main.dbg("RESULT: "+getProp(key));
 	}
@@ -128,7 +144,7 @@ public class ChuConf {
 		String data = ""; Iterator<String> it = prop.keySet().iterator();
 		if(header.length() > 0) data += "#"+header+"\n\n";
 		while(it.hasNext()) { String key = it.next(); data += propToStr(key, prop.get(key), 1); }
-		return data.substring(0, data.length()-1); //Remove last newline.
+		return data.length()==0?"":data.substring(0, data.length()-1); //Remove last newline.
 	}
 	
 	static String propToStr(String key, Object prop, int depth) {
@@ -141,13 +157,13 @@ public class ChuConf {
 	}
 	
 	//---- Config Reading / Writing:
-	static boolean isValid(String k) { return TST.matcher(k).matches(); }
-	static boolean isValid(String k, String v) { return TST.matcher(k).matches()&&VAL_TST.matcher(v).matches(); }
+	static boolean isValid(String k) { return KEY_TEST.matcher(k).matches(); }
+	static boolean isValid(String k, String v) { return KEY_TEST.matcher(k).matches()&&VAL_TEST.matcher(v).matches(); }
 	
 	public boolean setProp(String n, String v) { if(!isValid(n,v)) return false; prop.put(n, v); return true; }
 	public boolean setProp(String n, Integer v) { if(!isValid(n)) return false; prop.put(n, v); return true; }
 	public boolean setProp(String n, Double v) { if(!isValid(n)) return false; prop.put(n, v); return true; }
-	public boolean setProp(String n, ChuList<Integer> v) { if(!isValid(n)) return false; prop.put(n, v); return true; }
+	public boolean setProp(String n, ChuList<Object> v) { if(!isValid(n)) return false; prop.put(n, v); return true; }
 	public boolean setSection(String n, ChuConfSection s) { if(!isValid(n)) return false; prop.put(n, s); return true; }
 	
 	public Object getProp(String name) { return prop.get(name); }
@@ -166,44 +182,56 @@ class ChuConfSection {
 	
 	void trySetProp(String key, String rawVal, int line) throws Exception {
 		//TODO Main.dbg("subsection trySetProp:"+key+","+rawVal);
-		if(!ChuConf.isValid(key)) throw new Exception("Invalid property key! Line: "+line);
+		if(!ChuConf.isValid(key)) throw new Exception("Invalid property key '"+key+"'! Line: "+line);
 		try {
-			if(rawVal.contains(",")) {
-				String[] vals = rawVal.split(","); ChuList<Integer> intVals = new ChuList<Integer>();
-				for(int i=0,l=vals.length; i<l; i++) intVals.add(new Integer(vals[i]));
-				setProp(key, intVals);
-			} else if(rawVal.contains(".")) setProp(key, new Double(rawVal));
-			else setProp(key, new Integer(rawVal));
+			if(rawVal.contains(",")) { //List:
+				String[] vals = rawVal.split(","); ChuList<Object> valList = new ChuList<Object>();
+				//Determine list type:
+				int type = 0; //List Of Integer
+				if(vals[0].contains(".")) type = 1; //List Of Double
+				for(int i=0,l=vals.length; i<l; i++) {
+					if(type==1) valList.add(new Double(vals[i]));
+					else valList.add(new Integer(vals[i]));
+				}
+				setProp(key, valList);
+			} else if(rawVal.contains(".")) setProp(key, new Double(rawVal)); //Double
+			else setProp(key, new Integer(rawVal)); //Integer
 		} catch(NumberFormatException e) {
-			if(!setProp(key, rawVal)) throw new Exception("Invalid line formatting! Line: "+line);
+			if(!setProp(key, rawVal)) throw new Exception("Invalid line formatting! Line: "+line); //String
 		}
 		//TODO Main.dbg("RESULT: "+getProp(key));
 	}
 	void tryAddProp(String rawVal, int line) throws Exception {
 		//TODO Main.dbg("subsection tryAddProp:"+rawVal);
 		try {
-			if(rawVal.contains(",")) {
-				String[] vals = rawVal.split(","); ChuList<Integer> intVals = new ChuList<Integer>();
-				for(int i=0,l=vals.length; i<l; i++) intVals.add(new Integer(vals[i]));
-				addProp(intVals);
-			} else if(rawVal.contains(".")) addProp(new Double(rawVal));
-			else addProp(new Integer(rawVal));
+			if(rawVal.contains(",")) { //List:
+				String[] vals = rawVal.split(","); ChuList<Object> valList = new ChuList<Object>();
+				//Determine list type:
+				int type = 0; //List Of Integer
+				if(vals[0].contains(".")) type = 1; //List Of Double
+				for(int i=0,l=vals.length; i<l; i++) {
+					if(type==1) valList.add(new Double(vals[i]));
+					else valList.add(new Integer(vals[i]));
+				}
+				addProp(valList);
+			} else if(rawVal.contains(".")) addProp(new Double(rawVal)); //Double
+			else addProp(new Integer(rawVal)); //Integer
 		} catch(NumberFormatException e) {
-			if(!addProp(rawVal)) throw new Exception("Invalid line formatting! Line: "+line);
+			if(!addProp(rawVal)) throw new Exception("Invalid line formatting! Line: "+line); //String
 		}
 		//TODO Main.dbg("RESULT: "+getPropAt(list.size()-1));
 	}
 	
-	public boolean setProp(String n, String v) { if(!ChuConf.isValid("a",v)) return false; prop.put(n, v); return true; }
+	public boolean setProp(String n, String v) { if(!ChuConf.isValid(n,v)) return false; prop.put(n, v); return true; }
 	public boolean setProp(String n, Integer v) { if(!ChuConf.isValid(n)) return false; prop.put(n, v); return true; }
 	public boolean setProp(String n, Double v) { if(!ChuConf.isValid(n)) return false; prop.put(n, v); return true; }
-	public boolean setProp(String n, ChuList<Integer> v) { if(!ChuConf.isValid(n)) return false; prop.put(n, v); return true; }
+	public boolean setProp(String n, ChuList<Object> v) { if(!ChuConf.isValid(n)) return false; prop.put(n, v); return true; }
 	public boolean setSection(String n, ChuConfSection s) { if(!ChuConf.isValid(n)) return false; prop.put(n, s); return true; }
 	
-	public boolean addProp(String v) { if(!ChuConf.isValid(null,v)) return false; list.add(v); return true; }
+	public boolean addProp(String v) { if(!ChuConf.isValid("a",v)) return false; list.add(v); return true; }
 	public void addProp(Integer v) { list.add(v.toString()); }
 	public void addProp(Double v) { list.add(v.toString()); }
-	public void addProp(ChuList<Integer> v) { list.add(v); }
+	public void addProp(ChuList<Object> v) { list.add(v); }
 	
 	public Object getProp(String name) { return prop.get(name); }
 	public Object getPropAt(int ind) { return list.get(ind); }
@@ -217,6 +245,6 @@ class ChuConfSection {
 		String str="",dStr="-"; for(int i=1; i<depth; i++) dStr += "-"; Iterator<String> ki = getPropKeys();
 		while(ki.hasNext()) { String key = ki.next(); str += dStr+" "+ChuConf.propToStr(key, prop.get(key), depth+1); }
 		ChuIterator<Object> li = getPropList(); while(li.hasNext()) str += dStr+" "+ChuConf.propToStr(li.next());
-		return str.substring(0, str.length()-1); //Remove last newline.
+		return str.length()==0?"":str.substring(0, str.length()-1); //Remove last newline.
 	}
 }

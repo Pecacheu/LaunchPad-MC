@@ -207,9 +207,9 @@ public class Main extends JavaPlugin {
 		loc.setPitch(pl.getPitch()); p.teleport(loc);
 	}*/ //TODO DELETE
 	
-	private static float map(float input, float minIn, float maxIn, float minOut, float maxOut) {
+	/*private static float map(float input, float minIn, float maxIn, float minOut, float maxOut) {
 		return ((input-minIn)/(maxIn-minIn)*(maxOut-minOut))+minOut;
-	}
+	}*/
 	
 	@Override
 	public void onDisable() {
@@ -233,9 +233,8 @@ public class Main extends JavaPlugin {
 	
 	private boolean startServer() {
 		dbg("Starting socket server on port "+PORT);
-		try {
-			server = new ServerSocket(PORT);
-		} catch(Exception e) { err("Could not start server!"); return false; }
+		try { server = new ServerSocket(PORT); }
+		catch(Exception e) { err("Could not start server!"); return false; }
 		return true;
 	}
 	
