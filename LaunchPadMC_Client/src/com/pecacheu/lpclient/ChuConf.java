@@ -1,5 +1,4 @@
-//This work is licensed under a GNU General Public License. Visit http://gnu.org/licenses/gpl-3.0-standalone.html for details.
-//ChuConf Config File Interpreter, v2.4. Copyright (©) 2016, Pecacheu (Bryce Peterson, bbryce.com)
+//ChuConf Config File Interpreter, 2016 Pecacheu. GNU GPL v3
 
 package com.pecacheu.lpclient;
 

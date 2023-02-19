@@ -1,5 +1,4 @@
-//This work is licensed under a GNU General Public License. Visit http://gnu.org/licenses/gpl-3.0-standalone.html for details.
-//RaichuList v1.9, Copyright (©) 2016, Pecacheu (Bryce Peterson, bbryce.com).
+//RaichuList v1.9, 2016 Pecacheu. GNU GPL v3
 
 //An actually properly implemented List class? With error checking!? Imagine that!
 

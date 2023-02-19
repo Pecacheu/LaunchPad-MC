@@ -1,5 +1,4 @@
-//This work is licensed under a GNU General Public License. Visit http://gnu.org/licenses/gpl-3.0-standalone.html for details.
-//LaunchPadMC Server. Copyright (©) 2016, Pecacheu (Bryce Peterson, bbryce.com).
+//LaunchPadMC Server, 2016 Pecacheu. GNU GPL v3
 
 package com.pecacheu.lpserver;
 
@@ -28,7 +27,7 @@ import com.pecacheu.elevators.Floor;
 
 public class Main extends JavaPlugin {
 	static final String PERM_ADMIN = "launchpadmc.admin",
-	MSG_BADGE = "§e[LaunchPadMC]", PLUGIN_PATH = "plugins/LaunchPadMC/";
+	MSG_BADGE = "Â§e[LaunchPadMC]", PLUGIN_PATH = "plugins/LaunchPadMC/";
 	
 	int PORT = 25585;
 	volatile ServerSocket server = null;
@@ -75,7 +74,7 @@ public class Main extends JavaPlugin {
 	}
 	
 	private void initThreads() {
-		dbg("§bStarting LaunchPadMC...");
+		dbg("Â§bStarting LaunchPadMC...");
 		
 		if(!startServer()) { onDisable(); return; }
 		
@@ -214,7 +213,7 @@ public class Main extends JavaPlugin {
 	@Override
 	public void onDisable() {
 		//HandlerList.unregisterAll();
-		dbg("§dDisabling plugin."); closeServer();
+		dbg("Â§dDisabling plugin."); closeServer();
 		sThread.stop(); sThread = null;
 		sReadThread.stop(); sReadThread = null;
 		pingThread.stop(); pingThread = null;
@@ -267,19 +266,19 @@ public class Main extends JavaPlugin {
 	}
 	
 	private static void err(String str, Exception e) {
-		String msg = MSG_BADGE+" §b"+str+"§e: §c"+e.getClass().getSimpleName();
+		String msg = MSG_BADGE+" Â§b"+str+"Â§e: Â§c"+e.getClass().getSimpleName();
 		if(e.getMessage() != null) msg += " \""+e.getMessage()+"\"";
 		Bukkit.getConsoleSender().sendMessage(msg); e.printStackTrace();
 		Collection<? extends Player> players = Bukkit.getOnlinePlayers();
 		for(Player p : players) if(p.hasPermission(Main.PERM_ADMIN)) p.sendMessage(msg);
 	} private static void err(String str) {
-		String msg = MSG_BADGE+" Error: §c"+str; Bukkit.getConsoleSender().sendMessage(msg);
+		String msg = MSG_BADGE+" Error: Â§c"+str; Bukkit.getConsoleSender().sendMessage(msg);
 		Collection<? extends Player> players = Bukkit.getOnlinePlayers();
 		for(Player p : players) if(p.hasPermission(Main.PERM_ADMIN)) p.sendMessage(msg);
 	}
 	
 	private static void dbg(String str) {
-		String msg = MSG_BADGE+" §r"+str; Bukkit.getConsoleSender().sendMessage(msg);
+		String msg = MSG_BADGE+" Â§r"+str; Bukkit.getConsoleSender().sendMessage(msg);
 		Collection<? extends Player> players = Bukkit.getOnlinePlayers();
 		for(Player p : players) if(p.hasPermission(Main.PERM_ADMIN)) p.sendMessage(msg);
 	}

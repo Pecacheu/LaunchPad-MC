@@ -1,5 +1,4 @@
-//This work is licensed under a GNU General Public License. Visit http://gnu.org/licenses/gpl-3.0-standalone.html for details.
-//LaunchPadMC Server. Copyright (©) 2016, Pecacheu (Bryce Peterson, bbryce.com).
+//LaunchPadMC Server, 2016 Pecacheu. GNU GPL v3
 
 package com.pecacheu.lpclient;
 
